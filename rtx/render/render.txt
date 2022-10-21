@@ -1,0 +1,270 @@
+--@include rtx/render/materials.txt
+
+EPSILON = 0.0001
+
+render_scene = {
+    camPos = Vector(),
+    camAng = Angle(),
+    fov = 0,
+    maxDist = 0,
+    lightPos = Vector(),
+    bgColor = Color(),
+    bgExp = 0,
+    shadowSamples = {},
+    shadowStep = 0,
+    objects = {},
+    pixels = 0,
+    fxAA = false,
+    sunEnabel = true,
+    sunColor = Color(255, 255, 255)
+}
+
+
+function mixV(v1, v2, x)
+    return Vector(
+        v1[1] * x + v2[1] * (1-x),
+        v1[2] * x + v2[2] * (1-x),
+        v1[3] * x + v2[3] * (1-x)
+    )
+end
+
+function mixC(v1, v2, x)
+    return Color(
+        v1[1] * x + v2[1] * (1-x),
+        v1[2] * x + v2[2] * (1-x),
+        v1[3] * x + v2[3] * (1-x)
+    )
+end
+
+
+function reflect(rd, normal)
+    return rd - 2 * normal:dot(rd) * normal 
+end
+
+
+function stepN(n1, n2)
+    if n1 < n2 then return 1 end
+    return 0
+end
+
+
+function step(v1, v2)
+    return Vector(stepN(v1[1], v2[1]), stepN(v1[2], v2[2]), stepN(v1[3], v2[3])) 
+end
+
+
+function sign(v)
+    return Vector(math.sign(v[1]), math.sign(v[2]), math.sign(v[3])) 
+end
+
+
+function abs(v)
+    return Vector(math.abs(v[1]), math.abs(v[2]), math.abs(v[3])) 
+end
+
+
+render_OBJfunctions = {
+    floor = function(ro, rd)
+        local Pl = (-1.0 - ro[2]) / math.clamp(rd[2], -1, 0)
+        if Pl < 0 then Pl = 1000000000 end
+        return {Pl, Pl, Vector(0, 1, 0)}
+    end,
+    
+    sphere = function(ro, rd, pos, rad)
+        local Oc = ro - pos
+        local B = Oc:dot(rd)
+        local C = Oc:dot(Oc) - rad ^ 2
+        local H = B ^ 2 - C
+        if H < 0 then return {10000000000, 0, 0} end
+        H = math.sqrt(H)
+        SphN = (ro + rd * (-B - H)) - pos
+        return {-B - H, -B + H, SphN, rad}    
+    end,
+    
+    cube = function(ro, rd, pos, size)
+        ro = ro - pos
+        local m = 1 / rd
+        local n = m * ro
+        local k = abs(m) * size
+
+        local t1 = -n - k
+        local t2 = -n + k
+
+        local tN = math.max(t1[1], t1[2], t1[3])
+        local tF = math.min(t2[1], t2[2], t2[3])
+        if tN > tF or tF < 0 then return {10000000000, 0, 0} end
+        local normal = -sign(rd) * step(Vector(t1[2], t1[3], t1[1]), t1) * step(Vector(t1[3], t1[1], t1[2]), t1)
+        
+        return {tN, tF, normal, size}
+    end
+}
+
+
+function scene(ro, rd, ignored)
+    local out = {}
+    --printTable(render_scene.objects)
+    for i, v in pairs(render_scene.objects) do
+        if table.hasValue(ignored, v.id) then continue end
+        local t = v.type
+        if t == "floor" then
+            table.insert(out, {render_OBJfunctions.floor(ro, rd), v})
+        elseif t == "sphere" then
+            table.insert(out, {render_OBJfunctions.sphere(ro, rd, v.pos, v.radius), v}) 
+        elseif t == "cube" then
+            table.insert(out, {render_OBJfunctions.cube(ro, rd, v.pos, v.size), v}) 
+        end
+        
+    end
+    
+    return out
+    
+end
+
+
+function rayCast(ro, rd, ...)
+    local ignored = { ... }
+    local objects = scene(ro, rd, ignored)
+    
+    local min = 1000000000000
+    local object = {{-2, -2, Vector()}, {id = -2}}
+    
+    for i, obj in pairs(objects) do
+        
+        local dist = obj[1][1]
+        if dist < min then min = dist object = obj end
+        --local color = render_getMaterialColor(ro, rd, v[1][1], v[2], v[3])
+    end
+    
+    return object
+    
+end
+
+
+function getSoftShadow(ro, rd, p, lightDire, normal, oldRay)
+    
+    local newP = ro + rd * (oldRay[1][1] - EPSILON) --+ normal
+    
+    local ld = (render_scene.lightPos - newP):getNormalized()
+    
+    local ray = rayCast(newP, ld)
+    local dist = ray[1][1]
+    local shadow = 1
+    
+    
+    if ray[2].id ~= oldRay[2].id and dist > 0.01 then
+        shadow = 0.1
+    end
+    
+    return shadow
+    
+end
+
+
+function getLight(ro, rd, ray, p)
+    local lightDire = (render_scene.lightPos - p):getNormalized()
+    local normal = ray[1][3]
+    
+    local diffuse = math.clamp(lightDire:dot(normal), 0.01, 1)
+    
+    local reflected = reflect(rd, normal):getNormalized()
+    local specular = math.max(0, reflected:dot(lightDire)) ^ 4
+    
+    local shadow = 1
+    if normal:dot(lightDire) > 0 then
+        shadow = getSoftShadow(ro, rd, p, lightDire, normal, ray)
+    end
+    
+    return math.clamp((diffuse + specular) * shadow, 0, 1)
+end
+
+
+function render_calcPixel(ro, rd, ...)
+    local ray = rayCast(ro, rd, ...)
+    
+    local obj = ray[1]
+    local objData = ray[2]
+    
+    local mat = objData.mat
+    local cl = objData.color
+    local normal = obj[3]
+    
+    local dist = obj[1]
+    
+    --printTable(ray)
+    if dist > 0 and dist <= render_scene.maxDist and dist ~= -2 then
+        
+        local p = ro + rd * dist
+        local shadow = getLight(ro, rd, ray, p)
+        local matsCounter = 0
+        
+        local color = Color()
+        
+        if type(mat) == "string" then
+            color = render_getMaterialColor(ro, rd, dist, mat, normal, cl, objData.id)
+        else
+            for k, v in pairs(mat) do
+                matsCounter = matsCounter + 1
+                local coef = 1
+                if objData.matCoefs[matsCounter] ~= nil then coef = objData.matCoefs[matsCounter] end
+                color = color + render_getMaterialColor(ro, rd, dist, v, normal, cl, objData.id) * coef
+            end
+            
+            color = color / matsCounter
+        end
+        
+        color = color * shadow
+        
+        color = mixC(color, render_scene.bgColor, math.exp(render_scene.bgExp * (dist * dist) * 0.02))
+        
+        return color
+    else
+        local ld = (render_scene.lightPos - ro):getNormalized()
+        local sun = rd:dot(ld) ^ 32
+        
+        local n = math.max(0.95 * rd[2], 0) / 1.2
+        return (((render_scene.bgColor / 255) - Color(n, n, n)) * 255) + render_scene.sunColor * sun
+    end
+end
+
+
+
+function render_pixel(x, y, realX, realY)
+    
+    render_scene.pixels = render_scene.pixels + 1
+    
+    if not render_scene.fxAA then
+        local ro = render_scene.camPos
+        local rd = Vector(x, y, render_scene.fov):getNormalized()
+        rd:rotate(render_scene.camAng)
+        
+        return render_calcPixel(ro, rd)
+    else
+        local ro = render_scene.camPos
+        
+        local X = 0.125
+        local Y = -0.125
+        local Z = 0.375
+        local W = -0.375
+        
+        local uvX = realX - render_scene.HALF_RES
+        local uvY = realY - render_scene.HALF_RES
+        
+        local rd1 = Vector(uvX + X, uvY + Z, render_scene.fov):getNormalized()
+        local rd2 = Vector(uvX + W, uvY + X, render_scene.fov):getNormalized()
+        local rd3 = Vector(uvX + Y, uvY + W, render_scene.fov):getNormalized()
+        local rd4 = Vector(uvX + Z, uvY + Y, render_scene.fov):getNormalized()
+        
+        rd1:rotate(render_scene.camAng)
+        rd2:rotate(render_scene.camAng)
+        rd3:rotate(render_scene.camAng)
+        rd4:rotate(render_scene.camAng)
+        
+        
+        local colAA = render_calcPixel(ro, rd1 * Vector(1, -1, 1)) + render_calcPixel(ro, rd2 * Vector(1, -1, 1)) + render_calcPixel(ro, rd3 * Vector(1, -1, 1)) + render_calcPixel(ro, rd4 * Vector(1, -1, 1))
+        
+        return colAA * 0.25
+        
+    end
+end
+require("rtx/render/materials.txt")
+

@@ -1,0 +1,69 @@
+render.createRenderTarget("rtscreen")
+
+rendersCounter = 0
+
+function rawRender(func, perf, res, cb, startX, endX, startY, endY)
+    local quotaM = quotaMax() * perf
+    local output = {}
+    rendersCounter = rendersCounter + 1
+    
+    if startX == nil then startX = 0 end
+    if startY == nil then startY = 0 end
+    if endX == nil then endX = res - 1 end
+    if endY == nil then endY = res - 1 end
+    
+    local paint = coroutine.wrap(function(tbl, f)
+        for y=startY, endY do
+            for x=startX, endX do
+                local n = f(x, y)
+                table.insert(tbl, {x, y, n})
+                coroutine.yield()
+            end
+        end
+        return true
+    end)
+    hook.add("render","render_castRays" .. rendersCounter,function()
+        while quotaAverage()<quotaM do
+            if paint(output, func) then
+                cb(output)
+                hook.remove("render","render_castRays" .. rendersCounter)
+                return
+            end
+        end
+    end)
+end
+
+function drawScreen(res, tbl)
+    local scale = 1024 / res
+    local quotaM = quotaMax() * 0.8
+    local paint = coroutine.wrap(function(t)
+        for i=1, #t do
+            local x, y = t[i][1], t[i][2]
+            local color = t[i][3]
+            render.setColor( color )
+            render.drawRectFast(x * scale, y * scale, scale, scale)
+            coroutine.yield()
+        end
+        return true
+    end)
+    hook.add("renderoffscreen","render_draw",function()
+        render.selectRenderTarget("rtscreen")
+        while quotaAverage()<quotaM do
+            if paint(tbl) then
+                hook.remove("renderoffscreen","render_draw")
+                return
+            end
+        end
+    end)
+    hook.add("render","render_draw",function()
+        render.setRenderTargetTexture("rtscreen")
+        render.drawTexturedRect(0,0,512,512)
+    end)
+end
+
+
+function startRender(res, perf, renderFunc, callBack, startX, endX, startY, endY)
+    local cb = function(data) drawScreen(res, data) end
+    if callBack ~= nil then cb = callBack end
+    rawRender(renderFunc, perf, res, cb, startX, endX, startY, endY)
+end

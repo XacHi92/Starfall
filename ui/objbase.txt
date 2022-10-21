@@ -1,0 +1,79 @@
+local objbase = class("objbase")
+
+-- This is objects controll class,
+-- you dont need to change any code here
+
+
+function objbase:initialize()
+    
+    self.objects = {}
+    self.processHooks = {}
+    self.paintHooks = {}
+    
+end
+
+
+function objbase:addNewToProcess(obj) -- Mne tak prosche, idite nahuy
+    if self.processHooks[obj.processHook] == nil then
+        self.processHooks[obj.processHook] = {}
+        hook.add(obj.processHook, "obj_process", function()
+            for k, i in pairs(self.processHooks[obj.processHook]) do
+                if i.isShown == false then return end
+                if i.enable == true then i:process(i) end
+            end
+        end)
+    end
+    
+    if self.paintHooks[obj.paintHook] == nil then
+        self.paintHooks[obj.paintHook] = {}
+        hook.add(obj.paintHook, "obj_process", function()
+            for k, i in pairs(self.paintHooks[obj.paintHook]) do
+                if i.isShown == false then return end
+                if i.hiden == false then i:draw(i) end
+            end
+        end)
+    end
+    
+    table.insert(self.processHooks[obj.processHook], obj)
+    table.insert(self.paintHooks[obj.paintHook], obj)
+end
+
+
+function objbase:addObject(obj, id)
+    self.objects[id] = obj
+    self:addNewToProcess(obj)
+end
+
+
+function objbase:getObjById(id)
+    if self.objects[id] == nil then return nil end
+    return self.objects[id]
+end
+
+
+function objbase:objClass(id)
+    return self:getObjById(id).class.name
+end
+
+
+function objbase:removeById(id)
+    local o = self:getObjById(id)
+    table.removeByValue(self.processHooks[o.processHook], o)
+    table.removeByValue(self.paintHooks[o.paintHook], o)
+    table.remove(self.objects, id)
+end
+
+
+function objbase:removeProcessHook(name)
+    hook.remove(name, "obj_process")
+    table.remove(self.processHooks, name)
+end
+
+
+function objbase:removePaintHook(name)
+    hook.remove(name, "obj_process")
+    table.remove(self.paintHooks, name)
+end
+
+return objbase
+

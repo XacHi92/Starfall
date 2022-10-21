@@ -1,0 +1,25 @@
+local fonts = class("fonts")
+
+function fonts:initialize()
+    self.allfonts = {}
+end
+
+
+function fonts:setTextSize(size, font)
+    
+    local f = ""
+    
+    if font == nil or font == "" then f = "Arial" else f = font end
+    
+    if self.allfonts[f .. size] == nil then
+        offsetY = -size / 2
+        font = render.createFont(f, size, 600, true )
+        self.allfonts[f .. size] = {font, offsetY}
+    end
+    
+    local d = self.allfonts[f .. size]
+    render.setFont(d[1])
+    render.fontOffsetY = d[2]
+end
+
+return fonts

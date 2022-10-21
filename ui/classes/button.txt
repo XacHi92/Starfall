@@ -1,0 +1,120 @@
+--@include modules/ui/classes/obj.txt
+--@include modules/ui/classes/fonts.txt
+--@include modules/ui/classes/mouse.txt
+
+local object = require("modules/ui/classes/obj.txt")
+local fonts = require("modules/ui/classes/fonts.txt")
+local mouse = require("modules/ui/classes/mouse.txt")
+local button = class("button", object)
+
+function button:initialize(id, x, y, sx, sy, ...)
+    object.initialize(self, id)
+    
+    local args = {...}
+    
+    if buttonlib_buttonHowered == nil then
+        buttonlib_buttonHowered = false
+        buttonlib_buttonHoweredBy = nil
+    end
+    
+    self.x = x  self.sx = sx
+    self.y = y  self.sy = sy
+    
+    self.x = self.x - self.sx * 0.5
+    self.y = self.y - self.sy * 0.5
+    
+    self.xold = x self.yold = y
+    
+    self.sxh = self.sx / 2
+    self.syh = self.sy / 2
+    
+    self.title = args[1] and args[1] or "Button"
+    self.color = args[2] and args[2] or Color(255, 0, 0)
+    self.colorOnHower = args[3] and args[3] or Color(0, 255, 0)
+    self.fontColor = args[4] and args[4] or Color(255, 255, 255)
+    self.fontColorOnHower = args[5] and args[5] or Color(255, 255, 255)
+    
+    self.drawcolor = self.color
+    self.titlecolor = self.fontColor
+    self.fontscale = 32
+    
+    self.clicked = false
+    self.onClick = function() end
+    self.simpleText = true
+    
+    self.hoverDetectX = x + sx
+    self.hoverDetectY = y + sy
+    
+    self.titleShadow = false
+    self.buttonShadow = false
+    self.shadowColor = Color(20, 20, 20)
+    
+    self.standartPaint = function()
+        if self.buttonShadow then
+            render.setColor(self.shadowColor)
+            render.drawRect(self.x + 3, self.y + 3, self.sx, self.sy)
+        end
+        
+        render.setColor(self.drawcolor)
+        render.drawRect(self.x, self.y, self.sx, self.sy)
+        
+        fonts:setTextSize(self.fontscale)
+        if self.simpleText then
+            if self.titleShadow then
+                render.setColor(self.shadowColor)
+                render.drawSimpleText( self.x + self.sxh + 2, self.y + self.syh + render.fontOffsetY + 2, self.title, 1, 0)
+            end
+            render.setColor(self.titlecolor)
+            render.drawSimpleText( self.x + self.sxh, self.y + self.syh + render.fontOffsetY, self.title, 1, 0)
+        else
+            if self.titleShadow then
+                render.setColor(self.shadowColor)
+                render.drawText( self.x + self.sxh + 2, self.y + self.syh + render.fontOffsetY + 2, self.title, TEXT_ALIGN.CENTER)
+            end
+            render.setColor(self.titlecolor)
+            render.drawText( self.x + self.sxh, self.y + self.syh + render.fontOffsetY, self.title, TEXT_ALIGN.CENTER )
+        end
+    end
+    
+    self.paint = function()
+        self.standartPaint()
+    end
+    
+    self.process = function()
+        if self.hiden == true or buttonlib_buttonHowered and buttonlib_buttonHoweredBy ~= id then return end
+        buttonlib_buttonHowered = true
+        buttonlib_buttonHoweredBy = id
+        
+        if self.xold ~= self.x or self.yold ~= self.y then self.xold = self.x self.yold = self.y self.hoverDetectX = self.x + sx self.hoverDetectY = self.y + sy end
+        
+        local x, y = mouse:pos()
+        local click = mouse:isDown()
+        
+        if x > self.x and y > self.y and x < self.hoverDetectX and y < self.hoverDetectY then
+            self.drawcolor = self.colorOnHower
+            self.titlecolor = self.fontColorOnHower
+            
+            if not self.clicked and click then
+                self.clicked = true
+                self.onClick(self)
+            elseif not click then
+                self.clicked = false
+            end
+            
+        else
+            if click then self.clicked = true end
+            self.drawcolor = self.color
+            self.titlecolor = self.fontColor
+            buttonlib_buttonHowered = false
+        end
+    end
+    
+end
+
+
+function button:click()
+    self.onClick()
+end
+
+
+return button

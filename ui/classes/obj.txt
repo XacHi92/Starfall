@@ -1,0 +1,46 @@
+--@include modules/ui/objbase.txt
+
+local base = require("modules/ui/objbase.txt")
+local object = class("object")
+
+-- Base 'object' class, you need
+-- to use this class for every UI object (if you need)
+
+function object:initialize(id)
+    
+    self.id = id
+    self.processHook = "think"
+    self.paintHook = "render"
+    self.enable = true -- Can ON/OFF self.process execute
+    self.hiden = false -- Can ON/OFF self.paint execute
+    self.isShown = true -- Can ON/OFF self.paint AND self.process execute
+    
+    self.paint = function(selfobj) end -- Draw function           ( Runs with self obj in arguments )
+    self.process = function(selfobj) end -- Object logic funciton ( Runs with self obj in arguments )
+    
+    base:addObject(self, id)
+    
+end
+
+
+function object:getClass()
+    return self.class.name 
+end
+
+
+function object:draw()
+    self.paint()
+end
+
+
+function object:process()
+    self.process()
+end
+
+
+function object:remove()
+    base:removeById(self.id)
+end
+
+
+return object

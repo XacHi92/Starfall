@@ -1,0 +1,58 @@
+--@include modules/ui/classes/obj.txt
+
+local object = require("modules/ui/classes/obj.txt")
+local Mouse = class( "mouse", object)
+
+function Mouse:initialize()
+    object.initialize(self, 1337)
+    
+    self.x = 0
+    self.y = 0
+    self.lx = 0
+    self.ly = 0
+    
+    self.enable = false
+    self.framerate = 1 / 16
+    self.oldtime = timer.realtime()
+    
+    self.mouse1 = false
+    self.mouse2 = false
+    
+    self.paint = function()
+        if timer.realtime() > (self.oldtime + self.framerate) then
+            self.oldtime = timer.realtime()
+            self.lx = self.x and self.x or 0
+            self.ly = self.y and self.y or 0
+            self.x, self.y = render.cursorPos()
+            
+            self.mouse1 = input.isMouseDown( MOUSE.MOUSE1 )
+            self.mouse2 = input.isMouseDown( MOUSE.MOUSE2 )
+        end
+    end
+    
+end
+
+function Mouse:pos()
+    --if player():getActiveWeapon():isValid() and player():getActiveWeapon():getClass() ~= "weapon_empty_hands" then return 0, 0 end
+    if self.x == nil then return 0, 0 end
+    return self.x, self.y
+end
+
+
+function Mouse:rate(n)
+    self.framerate = 1 / n
+end
+
+
+function Mouse:isDown( button )
+    --if player():getActiveWeapon():isValid() and player():getActiveWeapon():getClass() ~= "weapon_empty_hands" then return 0 end
+    if button ~= nil then
+        if button == 1 then return self.mouse1 end
+        if button == 2 then return self.mouse2 end
+    end
+    
+    local butt = player():keyDown(ui.key_nums[ui.click_key])
+    return butt
+end
+
+return Mouse

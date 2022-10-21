@@ -1,0 +1,24 @@
+--@shared
+--@include modules/ui/objbase.txt
+--@include modules/ui/classes/button.txt
+--@include modules/ui/classes/fonts.txt
+--@include modules/ui/classes/mouse.txt
+
+ui = {
+    click_key = "mouse1",
+    key_nums = {
+        mouse1 = 1,
+        mouse2 = 2,
+        key_e = 32    
+    }
+}
+
+objbase = require("modules/ui/objbase.txt")
+button = require("modules/ui/classes/button.txt")
+fonts = require("modules/ui/classes/fonts.txt")
+mouse = require("modules/ui/classes/mouse.txt")
+
+objbase:initialize()
+fonts:initialize()
+mouse:initialize()
+

@@ -1,0 +1,201 @@
+--@name rtx_main
+--@author Gachi-Purka
+--@shared
+--@include modules/ui/include.txt
+--@include rtx/render/draw.txt
+--@include rtx/render/render.txt
+
+if CLIENT then
+    
+    -- GRAPHICS SETTINGS =========================
+        
+        local res = 256
+        local FOV = 160
+        local MaxDist = 100
+        local perf = 70 -- In percents
+        local fxAA = true
+        
+    -- SCENE SETTINGS ============================
+    
+        local LightPos = Vector(20, 30, -30)
+        local CameraPos = Vector(0, 0, -3)
+        local CameraAng = Angle(0, 0, 0)
+        
+        local SunEanable = true
+        local SunColor = Color(255, 255, 120)
+        
+        local Background = Color(128, 204, 230)
+        
+        -- An table with all objects on scene 
+
+        local scene_objects = {
+            {
+                type = "floor",
+                color = Color(255, 255, 255),
+                mat = "chess"
+            },
+            {
+                type = "sphere",
+                pos = Vector(1, 0, 0),
+                radius = 1,
+                color = Color(255, 255, 0),
+                mat = "mirror"
+            },
+            {
+                type = "cube",
+                pos = Vector(-1, 0, 0),
+                size = Vector(0.5, 0.5, 0.5),
+                color = Color(255, 0, 0),
+                mat = "default"
+            }
+        }
+
+        
+        
+
+--[[
+        for j=1, 12 do
+            for i=1, 12 do
+            local sphere = {
+                type = "sphere",
+                pos = Vector(-1, 0, 0),
+                radius = 1,
+                color = Color(255, 255, 0),
+                mat = "default"
+            }
+            
+            sphere.pos = Vector((6 - (i-1)) * 2.1, 0, 3 + j * 2.1)
+            table.insert(scene_objects, sphere)
+            end
+        end
+]]
+        
+    -- OTHER SETTINGS ============================
+    
+        local autoStart = false -- Starts render on owner when chip is loaded
+    
+    -- END USER INPUT ============================
+    
+    
+    require("modules/ui/include.txt")
+    require("rtx/render/draw.txt")
+    require("rtx/render/render.txt")
+    
+    ui.click_key = "key_e"
+    
+    -- Some useful variables and constants
+    
+    local HALF_RES = res * 0.5
+    local maxPixels = res ^ 2
+    local bgExp = -0.0007 * MaxDist
+    local showStartScreen = true
+    perf = math.clamp(perf, 0, 80)
+    perf = perf / 100
+    local maxQuota = quotaMax() * perf
+    
+    -- Transfer data to scene table
+    -- Prosto tak udobnee :P
+    
+    render_scene.objects = scene_objects
+    render_scene.fov = FOV
+    render_scene.bgColor = Background
+    render_scene.camPos = CameraPos
+    render_scene.camAng = CameraAng
+    render_scene.maxDist = MaxDist
+    render_scene.lightPos = LightPos
+    render_scene.bgExp = bgExp
+    render_scene.fxAA = fxAA
+    render_scene.res = res
+    render_scene.HALF_RES = HALF_RES
+    render_scene.sunEnable = SunEnable
+    render_scene.sunColor = SunColor
+    
+    
+    -- Title screen
+    
+    hook.add("render", "start_screen", function()
+        if showStartScreen == false then return end
+        
+        render.setColor( Color(40, 40, 45) ) -- background
+        render.drawRectFast(0, 0, 512, 512)
+        
+        render.setColor( Color(200, 200, 200) )
+        
+        fonts:setTextSize(32)
+        render.drawText(32 * 3.5, 75, "типа", TEXT_ALIGN.CENTER)
+        
+        fonts:setTextSize(128)
+        render.drawText(256, 0, "RTX", TEXT_ALIGN.CENTER)
+        
+        fonts:setTextSize(20)
+        render.drawText(256, 110, "Это попытка Хачипрыги создать красивые рендеры.\nНажимая кнопку у Вас может начать лагать,\nибо все вычисления будут производится у ВАС на клиенте.", TEXT_ALIGN.CENTER)
+        
+        render.setColor( Color(255, 255, 255) )
+        
+        render.drawSimpleText(64, 180, "Параметры сцены:")
+        
+        render.drawSimpleText(32, 220, "Разрешение: ".. res .. "x" .. res)
+        render.drawSimpleText(32, 240, "FOV: " .. FOV)
+        render.drawSimpleText(32, 255, "Нагрузка: ".. perf * 100 .. "%")
+        render.drawSimpleText(32, 275, "Кол-во объектов: ".. table.count(scene_objects))
+        render.drawSimpleText(32, 295, "Сглаживание: ".. tostring(fxAA))
+    end)
+    
+    local startButton = button(1, 256, 384 + 64, 128 + 64 + 32, 64, "Залагать нахуй!", Color(200, 200, 200), Color(100, 100, 100), Color(100, 100, 100), Color(200, 200, 200))
+    startButton.onClick = function()
+        showStartScreen = false
+        startButton.isShown = false
+        
+        local counter = 0
+        for i, v in pairs(render_scene.objects) do
+            if v.id == nil then
+                counter = counter + 1
+                v.id = counter
+            end
+            --v.color = v.color / 255
+        end
+        
+        startRender(res, perf, function(x, y)
+            
+            local uvX = x - HALF_RES
+            local uvY = (y - HALF_RES) * -1
+            
+            local color = render_pixel(uvX, uvY, x, y)
+            
+            local clX = math.clamp(((color[1] / 255) ^ 0.45) * 255, 0, 255)
+            local clY = math.clamp(((color[2] / 255) ^ 0.45) * 255, 0, 255)
+            local clZ = math.clamp(((color[3] / 255) ^ 0.45) * 255, 0, 255)
+            
+            return Color(clX, clY, clZ)
+        end)
+        
+        hook.add("render", "loadscreen", function()
+            render.setRenderTargetTexture("screen")
+            local w, h = render.getResolution()
+            
+            local percent = render_scene.pixels / maxPixels * 100
+            percent = math.round(percent)
+            
+            fonts:setTextSize(32)
+            render.drawText( w * 0.5, h * 0.2, "Loadong..." .. " " .. tostring(percent) .. "%", TEXT_ALIGN.CENTER )
+            
+            if percent == 100 then hook.remove("render", "loadscreen") end
+            
+        end)
+        
+        
+    end
+    
+    if autoStart and player() == owner() then
+        startButton:click()
+    end
+    
+else
+    local screen = prop.createComponent(
+        chip():getPos() + Vector(0, 0, 60), 
+        (owner():getPos() - chip():getPos()):getAngle() * Angle(0, 1, 0) + Angle(90, 0, 0), 
+        "starfall_screen", "models/hunter/plates/plate2x2.mdl", 1
+    ) 
+    screen:linkComponent(chip())
+    screen:setCollisionGroup(1)
+end

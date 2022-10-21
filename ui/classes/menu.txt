@@ -1,0 +1,47 @@
+--@include modules/ui/classes/obj.txt
+
+local object = require("modules/ui/classes/obj.txt")
+
+local Menu = class("menu", object)
+
+function Menu:initialize()
+    object.initialize(self, 444552)
+    
+    
+    self.current = "screen"
+    self.begining = ""
+    self.menus = {}
+    
+    
+    self.paint = function() end
+    
+end
+
+
+function Menu:register(menu_name, RT_name)
+    if self.menus[menu_name] == nil then
+        self.menus[menu_name] = {}
+    end
+    
+    local menu = self.menus[menu_name]
+    
+    menu.RT = RT_name
+    menu.name = menu_name
+end
+
+
+function Menu:begin(name)
+    if self.menus[name] == nil then return false end
+    self.begining = name
+    return true
+end
+
+
+function Menu:select(name)
+    if self.menus[name] == nil then return false end
+    self.current = name
+    return true
+end
+
+
+return Menu

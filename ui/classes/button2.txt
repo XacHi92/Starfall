@@ -1,0 +1,135 @@
+--@include modules/ui/classes/obj.txt
+--@include modules/ui/classes/fonts.txt
+--@include modules/ui/classes/mouse.txt
+--@include modules/ui/classes/menu.txt
+
+
+local object = require("modules/ui/classes/obj.txt")
+local fonts = require("modules/ui/classes/fonts.txt")
+local mouse = require("modules/ui/classes/mouse.txt")
+local menu = require("modules/ui/classes/menu.txt")
+local buttons = class("button", object)
+
+
+function inrange(cX, cY, sX, sY, eX, eY)
+    if (cX > sX and cX < eX) and (cY > sY and cY < eY) then
+        return true 
+    end
+    return false
+end
+
+
+function Buttons:initialize()
+    object.initialize(self, 444551)
+    
+    self.buttons = {}
+    self.defaults = {}
+    
+    self.defaults.paint = function(button)
+        if button.buttonShadow then
+            render.setColor(button.shadowColor)
+            render.drawRect(button.x + 3, button.y + 3, button.sx, button.sy)
+        end
+        
+        render.setColor(button.drawcolor)
+        render.drawRect(button.x, button.y, button.sx, button.sy)
+        
+        fonts:setTextSize(button.fontscale)
+        if button.simpleText then
+            if button.titleShadow then
+                render.setColor(button.shadowColor)
+                render.drawSimpleText( button.x + button.sxh + 2, button.y + button.syh + render.fontOffsetY + 2, button.title, 1, 0)
+            end
+            render.setColor(button.titlecolor)
+            render.drawSimpleText( button.x + button.sxh, button.y + button.syh + render.fontOffsetY, button.title, 1, 0)
+        else
+            if button.titleShadow then
+                render.setColor(button.shadowColor)
+                render.drawText( button.x + button.sxh + 2, button.y + button.syh + render.fontOffsetY + 2, button.title, TEXT_ALIGN.CENTER)
+            end
+            render.setColor(button.titlecolor)
+            render.drawText( button.x + button.sxh, button.y + button.syh + render.fontOffsetY, button.title, TEXT_ALIGN.CENTER )
+        end    
+    end
+    self.defaults.think = function(button)
+        
+        local cX, cY = mouse:pos()
+        local click = mouse:isDown()
+        
+        local isHowered = inrange(cX, cY, button.Start[1], button.Start[2], button.End[1], button.End[2])
+        
+        if button.howered ~= isHowered then
+            button.howered = isHowered
+            hook.run("ui.buttons-paint_update", button)
+        end
+        
+        
+        
+    end
+    
+    -- Global buttons processor
+    self.think = function()
+        
+        for i, button in pairs(self.buttons) do
+            
+        end
+        
+        
+    end
+    
+    
+    
+    
+    
+end
+
+
+function Buttons:create(id, x, y, sx, sy, ...)
+    local args = { ... }
+    
+    local button = {}
+    
+    -- Basic settings
+    
+        button.title = args[1] and args[1] or "Button"
+        button.color = args[2] and args[2] or Color(255, 0, 0)
+        button.colorOnHower = args[3] and args[3] or Color(0, 255, 0)
+        button.fontColor = args[4] and args[4] or Color(255, 255, 255)
+        button.fontColorOnHower = args[5] and args[5] or Color(255, 255, 255)
+        
+        button.drawcolor = self.color
+        button.titlecolor = self.fontColor
+        button.fontscale = 32
+    
+    
+    -- Setuping values
+    
+        button.x = x
+        button.y = y
+        button.sx = sx
+        button.sy = sy
+        
+        button.sx_half = sx * 0.5
+        button.sy_half = sy * 0.5
+        
+        
+        
+    
+    -- For mouse detection
+        button.Start = {button.x - button.sx_half, button.y - button.sy_half}
+        button.End = {button.x + button.sx_half, button.y + button.sy_half}
+    
+    -- Button functions
+        button.onClick = function() end
+        
+        button.paint = self.defaults.paint
+        button.think = self.defaults.think
+        
+        
+    self.buttons[]
+    
+    
+    
+end
+
+return Buttons

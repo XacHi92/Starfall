@@ -1,0 +1,34 @@
+materials = {
+    default = function(color) return color end,
+    chess = function(color, p)
+        local H = 0.1
+        local n = 0
+        local P3 = p / 0.1 * H
+        P3 = Vector(math.ceil(P3.x), math.ceil(P3.y), math.ceil(P3.z))
+        local N = (P3[1] + P3[3]) % 2 == 0
+        if N == false then n = 1 else n = 0.2 end
+        return color * n
+    end,
+    mirror = function(ro, rd, normal, dist, color, id)
+        local p = ro + rd * dist + normal * 0.1
+        local reflectedRD =  reflect(rd, normal):getNormalized()
+        
+        local reflectedColor = render_calcPixel(p, reflectedRD, id)
+        
+        return (color + reflectedColor) * 0.5
+        
+        
+    end
+}
+
+
+function render_getMaterialColor(ro, rd, dist, mat, normal, color, id)
+    if mat == "default" then
+        return materials.default(color)
+    elseif mat == "chess" then
+        local p = ro + rd * dist
+        return materials.chess(color, p)
+    elseif mat == "mirror" then
+        return materials.mirror(ro, rd, normal, dist, color, id)
+    end
+end
