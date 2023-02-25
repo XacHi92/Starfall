@@ -1,10 +1,25 @@
+--@include modules/random.txt
+local math_ceil = math.ceil
+local math_random = math.random
+
+require("modules/random.txt")
+
+
+
+
+
+
+
+
+
+
 materials = {
     default = function(color) return color end,
     chess = function(color, p)
         local H = 0.1
         local n = 0
         local P3 = p / 0.1 * H
-        P3 = Vector(math.ceil(P3.x), math.ceil(P3.y), math.ceil(P3.z))
+        P3 = Vector(math_ceil(P3.x), math_ceil(P3.y), math_ceil(P3.z))
         local N = (P3[1] + P3[3]) % 2 == 0
         if N == false then n = 1 else n = 0.2 end
         return color * n
@@ -21,6 +36,24 @@ materials = {
     end
 }
 
+materials_rtx = {
+    default = function(color, rd, normal) return {color, reflect(rd, normal)} end,
+    soft = function(ro, rd, normal, dist, id, roughnes, lightConsum, color)
+        local p = ro + rd * dist + normal * 0.1
+        local N = Vector()
+        if roughnes > 0 then
+            N = Vector(random.rand(), random.rand(), random.rand()) * roughnes 
+        end
+        
+        local reflectedRD =  (reflect(rd, normal) + N):getNormalized()
+        
+        return {color, reflectedRD}
+    end,
+    lightsource = function(color)
+        return {color, Vector()}
+    end
+}
+
 
 function render_getMaterialColor(ro, rd, dist, mat, normal, color, id)
     if mat == "default" then
@@ -31,4 +64,16 @@ function render_getMaterialColor(ro, rd, dist, mat, normal, color, id)
     elseif mat == "mirror" then
         return materials.mirror(ro, rd, normal, dist, color, id)
     end
+end
+
+
+function render_getMaterialColorRTX(ro, rd, dist, mat, normal, color, id, roughnes, lightConsum)
+    if mat == "default" then
+        return materials_rtx.default(color, rd, normal)
+    elseif mat == "soft" then
+        return materials_rtx.soft(ro, rd, normal, dist, id, roughnes, lightConsum, color)
+    elseif mat == "lightsource" then
+        return materials_rtx.lightsource(color)
+    end
+    
 end

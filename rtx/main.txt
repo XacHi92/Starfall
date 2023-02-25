@@ -5,28 +5,52 @@
 --@include rtx/render/draw.txt
 --@include rtx/render/render.txt
 
+--if player() ~= owner() then return end
+
 if CLIENT then
     
     -- GRAPHICS SETTINGS =========================
         
-        local res = 256
-        local FOV = 160
+        local resMult = 4
+        
+        local res = 64 * resMult
+        local FOV = 45 * resMult
         local MaxDist = 100
-        local perf = 70 -- In percents
-        local fxAA = true
+        local perf = 90 -- In percents
+        local fxAA = false
+        local RTX = true
+        local Smoothing = false
+        local AmbientOclusionCoef = 0.3
+        local ShowTime = true
+        
+    -- RTX ONLY settings =========================
+    
+        local ray_bounceLeft = 64 -- How many times ray bounce from objects before return
+        local ray_samples = 64 -- Count of rays per pexel
+        local SkyMul = 0.01
+        local SunMul = 1
+        
+        local White = 0.2
+        local Exposure = 2
         
     -- SCENE SETTINGS ============================
     
         local LightPos = Vector(20, 30, -30)
+        --local CameraPos = Vector(2.5, 4, -3)
+        --local CameraAng = Angle(-40, 0, 50)
+        
         local CameraPos = Vector(0, 0, -3)
         local CameraAng = Angle(0, 0, 0)
         
         local SunEanable = true
-        local SunColor = Color(255, 255, 120)
+        local SunColor = Color(255, 255, 255)
         
         local Background = Color(128, 204, 230)
         
-        -- An table with all objects on scene 
+    -- An table with all objects on scene 
+
+
+--[[
 
         local scene_objects = {
             {
@@ -36,23 +60,80 @@ if CLIENT then
             },
             {
                 type = "sphere",
-                pos = Vector(1, 0, 0),
+                pos = Vector(0, 0, 0),
                 radius = 1,
                 color = Color(255, 255, 0),
-                mat = "mirror"
-            },
-            {
-                type = "cube",
-                pos = Vector(-1, 0, 0),
-                size = Vector(0.5, 0.5, 0.5),
-                color = Color(255, 0, 0),
                 mat = "default"
             }
         }
+]]
+
 
         
-        
 
+
+        local scene_objects = { -- RTX Variant
+
+            {
+                type = "floor",
+                color = Color(200),
+                mat = "soft",
+                roughnes = 1,
+                lightConsum = 0.6 -- Reflects 80% of light
+            },
+            {
+                type = "sphere",
+                pos = Vector(0, -0.25, 0),
+                radius = 0.75,
+                color = Color(255, 255, 0),
+                mat = "soft",
+                roughnes = 1,
+                lightConsum = 0.6,
+                colorMul = 1
+
+            },
+
+
+            {
+                type = "sphere",
+                pos = Vector(0, 0, 3),
+                radius = 0.75,
+                color = Color(255, 200, 120),
+                mat = "lightsource",
+                lightPower = 30
+            },
+            {
+                type = "sphere",
+                pos = Vector(1.25, -1+0.5, 0),
+                radius = 0.25,
+                color = Color(200, 140, 255),
+                mat = "lightsource",
+                roughnes = 1,
+                lightPower = 30
+            },
+            {
+                type = "sphere",
+                pos = Vector(-1.25, -1+0.5, 0),
+                radius = 0.5,
+                color = Color(0, 100, 255),
+                mat = "lightsource",
+                roughnes = 1,
+                lightPower = 10
+            }
+
+
+
+
+        }
+
+
+
+    -- OTHER SETTINGS ============================
+    
+        local autoStart = true -- Starts render on owner when chip is loaded
+    
+    -- END USER INPUT ============================
+    
 --[[
         for j=1, 12 do
             for i=1, 12 do
@@ -70,11 +151,6 @@ if CLIENT then
         end
 ]]
         
-    -- OTHER SETTINGS ============================
-    
-        local autoStart = false -- Starts render on owner when chip is loaded
-    
-    -- END USER INPUT ============================
     
     
     require("modules/ui/include.txt")
@@ -89,9 +165,10 @@ if CLIENT then
     local maxPixels = res ^ 2
     local bgExp = -0.0007 * MaxDist
     local showStartScreen = true
-    perf = math.clamp(perf, 0, 80)
+    --perf = math.clamp(perf, 0, 80)
     perf = perf / 100
     local maxQuota = quotaMax() * perf
+
     
     -- Transfer data to scene table
     -- Prosto tak udobnee :P
@@ -109,6 +186,18 @@ if CLIENT then
     render_scene.HALF_RES = HALF_RES
     render_scene.sunEnable = SunEnable
     render_scene.sunColor = SunColor
+    render_scene.rtx = RTX
+    render_scene.raySamples = ray_samples
+    render_scene.rayBounceLeft = ray_bounceLeft
+    render_scene.ambientCoef = AmbientOclusionCoef
+    render_scene.skyMul = SkyMul
+    render_scene.sunMul = SunMul
+    render_scene.white = White
+    render_scene.exposure = Exposure
+    smoothMode = Smoothing
+
+    
+    
     
     
     -- Title screen
@@ -155,19 +244,19 @@ if CLIENT then
             --v.color = v.color / 255
         end
         
+        local math_clamp = math.clamp
+        local startTime = timer.realtime()
+        
         startRender(res, perf, function(x, y)
-            
             local uvX = x - HALF_RES
             local uvY = (y - HALF_RES) * -1
             
             local color = render_pixel(uvX, uvY, x, y)
             
-            local clX = math.clamp(((color[1] / 255) ^ 0.45) * 255, 0, 255)
-            local clY = math.clamp(((color[2] / 255) ^ 0.45) * 255, 0, 255)
-            local clZ = math.clamp(((color[3] / 255) ^ 0.45) * 255, 0, 255)
-            
-            return Color(clX, clY, clZ)
+            return color
         end)
+        
+        local stage = 0
         
         hook.add("render", "loadscreen", function()
             render.setRenderTargetTexture("screen")
@@ -179,8 +268,8 @@ if CLIENT then
             fonts:setTextSize(32)
             render.drawText( w * 0.5, h * 0.2, "Loadong..." .. " " .. tostring(percent) .. "%", TEXT_ALIGN.CENTER )
             
-            if percent == 100 then hook.remove("render", "loadscreen") end
-            
+            if percent == 100 and stage == 0 then stage = 1 render_scene.pixels = 0 end
+            if percent == 100 and stage == 1 then print("Rendered in " .. math.round(timer.realtime() - startTime, 4) .. " seconds") hook.remove("render", "loadscreen") end
         end)
         
         

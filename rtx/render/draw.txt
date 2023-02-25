@@ -1,6 +1,9 @@
 render.createRenderTarget("rtscreen")
 
 rendersCounter = 0
+local table_insert = table.insert
+local coroutine_yield = coroutine.yield
+local render_drawRectFast = render.drawRectFast
 
 function rawRender(func, perf, res, cb, startX, endX, startY, endY)
     local quotaM = quotaMax() * perf
@@ -16,16 +19,18 @@ function rawRender(func, perf, res, cb, startX, endX, startY, endY)
         for y=startY, endY do
             for x=startX, endX do
                 local n = f(x, y)
-                table.insert(tbl, {x, y, n})
-                coroutine.yield()
+                table_insert(tbl, {x, y, n})
+                coroutine_yield()
             end
         end
         return true
     end)
+    
     hook.add("render","render_castRays" .. rendersCounter,function()
         while quotaAverage()<quotaM do
             if paint(output, func) then
                 cb(output)
+                paint = function() end
                 hook.remove("render","render_castRays" .. rendersCounter)
                 return
             end
@@ -33,16 +38,22 @@ function rawRender(func, perf, res, cb, startX, endX, startY, endY)
     end)
 end
 
-function drawScreen(res, tbl)
+screen_data = {}
+
+function drawScreen(res, tbl, cb)
     local scale = 1024 / res
     local quotaM = quotaMax() * 0.8
     local paint = coroutine.wrap(function(t)
         for i=1, #t do
             local x, y = t[i][1], t[i][2]
             local color = t[i][3]
+            
+            if screen_data[y] == nil then screen_data[y] = {} end
+            screen_data[y][x] = color
+            
             render.setColor( color )
-            render.drawRectFast(x * scale, y * scale, scale, scale)
-            coroutine.yield()
+            render_drawRectFast(x * scale, y * scale, scale, scale)
+            coroutine_yield()
         end
         return true
     end)
@@ -50,6 +61,8 @@ function drawScreen(res, tbl)
         render.selectRenderTarget("rtscreen")
         while quotaAverage()<quotaM do
             if paint(tbl) then
+                paint = function() end
+                pcall(cb)
                 hook.remove("renderoffscreen","render_draw")
                 return
             end
@@ -62,8 +75,38 @@ function drawScreen(res, tbl)
 end
 
 
+local pattern = {{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {0, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
+local RES = 64
+
+local function smooth(x, y)
+
+    render_scene.pixels = render_scene.pixels + 1
+    local pixel = screen_data[y][x]
+    local color = Color()
+    for i=1, 8 do
+        local xp = pattern[i][1]
+        local yp = pattern[i][2]
+        local cl = screen_data[math.clamp(y + yp, 0, RES - 1)][math.clamp(x + xp, 0, RES - 1)]
+        color = color + Color(cl[1] or 0, cl[2] or 0, cl[3] or 0)
+    end
+    return (pixel + color / 9) * 0.5
+end
+
 function startRender(res, perf, renderFunc, callBack, startX, endX, startY, endY)
-    local cb = function(data) drawScreen(res, data) end
+    RES = res
+    local cb2 = function(data) 
+        rawRender(smooth, perf, res, function(data) print("Smoothing complited!") drawScreen(res, data) end, startX, endX, startY, endY)
+    end
+    
+    local cb1 = function(data)
+        if smoothMode then
+            print("Render ended, smoothing...")
+            drawScreen(res, data, cb2)
+        else
+            drawScreen(res, data)
+        end
+    end
+    
     if callBack ~= nil then cb = callBack end
-    rawRender(renderFunc, perf, res, cb, startX, endX, startY, endY)
+    rawRender(renderFunc, perf, res, cb1, startX, endX, startY, endY)
 end
