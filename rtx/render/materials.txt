@@ -6,13 +6,6 @@ require("modules/random.txt")
 
 
 
-
-
-
-
-
-
-
 materials = {
     default = function(color) return color end,
     chess = function(color, p)
@@ -51,6 +44,40 @@ materials_rtx = {
     end,
     lightsource = function(color)
         return {color, Vector()}
+    end,
+    glass = function(color, rd, normal, id)
+        local eta_t = render_scene.objectsIDs.id.radius or 1
+        --local frenel = 1 - math.abs((-rd):dot(normal))
+        local passThrow = true
+        
+        local i_dot_n = rd:dot(normal)
+        local ref_n = normal
+        local eta_i = 1
+        
+        if i_dot_n < 0 then
+            i_dot_n = -i_dot_n 
+        else
+            eta_i = eta_t
+            eta_t = 1
+            ref_n = -normal
+        end
+        
+
+--[[
+        if math.random(0, 1) - 0.1 < frenel ^ 2 then
+            outRd = reflect(rd, normal)
+            passThrow = false
+        else
+]]
+            --local N1 = normal:dot(rd)
+            
+            local eta = eta_i / eta_t
+            local k = 1 - (eta * eta) * (1 - i_dot_n * i_dot_n)
+            
+            --local outRd = eta * rd - (eta * N1 + math.sqrt(k)) * normal
+            local outRd = (rd + i_dot_n * ref_n) * eta - ref_n * math.sqrt(k)
+        --end
+        return {color, outRd, passThrow}
     end
 }
 
@@ -74,6 +101,8 @@ function render_getMaterialColorRTX(ro, rd, dist, mat, normal, color, id, roughn
         return materials_rtx.soft(ro, rd, normal, dist, id, roughnes, lightConsum, color)
     elseif mat == "lightsource" then
         return materials_rtx.lightsource(color)
+    elseif mat == "glass" then
+        return materials_rtx.glass(color, rd, normal, id)
     end
     
 end

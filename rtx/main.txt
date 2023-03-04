@@ -11,27 +11,27 @@ if CLIENT then
     
     -- GRAPHICS SETTINGS =========================
         
-        local resMult = 4
+        local resMult = 1
         
         local res = 64 * resMult
-        local FOV = 45 * resMult
+        local FOV = 50 * resMult
         local MaxDist = 100
         local perf = 90 -- In percents
         local fxAA = false
         local RTX = true
         local Smoothing = false
-        local AmbientOclusionCoef = 0.3
+        local SmoothMult = 6
         local ShowTime = true
         
     -- RTX ONLY settings =========================
     
         local ray_bounceLeft = 64 -- How many times ray bounce from objects before return
         local ray_samples = 64 -- Count of rays per pexel
-        local SkyMul = 0.01
+        local SkyMul = 1
         local SunMul = 1
         
-        local White = 0.2
-        local Exposure = 2
+        local White = 0.7 -- 0.7
+        local Exposure = 0.7 -- 0.8
         
     -- SCENE SETTINGS ============================
     
@@ -73,14 +73,33 @@ if CLIENT then
 
 
         local scene_objects = { -- RTX Variant
+            
+--[[
+            {
+                type = "cube",
+                pos = Vector(0, 0, 0),
+                size = 1,
+                color = Color(255, 0, 0),
+                mat = "soft",
+                roughnes = 1,
+                lightConsum = 0.3,
+                colorMul = 1
+
+            },
+            
+]]
+            
+
 
             {
                 type = "floor",
                 color = Color(200),
                 mat = "soft",
                 roughnes = 1,
-                lightConsum = 0.6 -- Reflects 80% of light
+                lightConsum = 0.2 -- Reflects 80% of light
             },
+--[[
+            
             {
                 type = "sphere",
                 pos = Vector(0, -0.25, 0),
@@ -88,23 +107,29 @@ if CLIENT then
                 color = Color(255, 255, 0),
                 mat = "soft",
                 roughnes = 1,
-                lightConsum = 0.6,
+                lightConsum = 0.3,
                 colorMul = 1
 
             },
+]]
 
+
+
+
+
+--[[
 
             {
                 type = "sphere",
-                pos = Vector(0, 0, 3),
+                pos = Vector(0, 1.75, 0),
                 radius = 0.75,
                 color = Color(255, 200, 120),
                 mat = "lightsource",
-                lightPower = 30
+                lightPower = 50
             },
             {
                 type = "sphere",
-                pos = Vector(1.25, -1+0.5, 0),
+                pos = Vector(1.5, -1+0.5, 2),
                 radius = 0.25,
                 color = Color(200, 140, 255),
                 mat = "lightsource",
@@ -113,13 +138,18 @@ if CLIENT then
             },
             {
                 type = "sphere",
-                pos = Vector(-1.25, -1+0.5, 0),
+                pos = Vector(-1.5, -1+0.5, -2),
                 radius = 0.5,
                 color = Color(0, 100, 255),
                 mat = "lightsource",
                 roughnes = 1,
                 lightPower = 10
             }
+
+]]
+
+
+
 
 
 
@@ -174,6 +204,7 @@ if CLIENT then
     -- Prosto tak udobnee :P
     
     render_scene.objects = scene_objects
+    render_scene.objectsIDs = {}
     render_scene.fov = FOV
     render_scene.bgColor = Background
     render_scene.camPos = CameraPos
@@ -195,6 +226,7 @@ if CLIENT then
     render_scene.white = White
     render_scene.exposure = Exposure
     smoothMode = Smoothing
+    smoothMult = SmoothMult
 
     
     
@@ -240,6 +272,7 @@ if CLIENT then
             if v.id == nil then
                 counter = counter + 1
                 v.id = counter
+                render_scene.objectsIDs.id = v
             end
             --v.color = v.color / 255
         end

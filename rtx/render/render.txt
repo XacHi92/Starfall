@@ -270,8 +270,10 @@ local rayFirstHit = false
 
 function render_calcPixelRTX(ro, rd, bounceLimit, rayColor, ...)
     
-    if bounceLimit == render_scene.rayBounceLeft then rayFirstHit = true end
-    
+    if bounceLimit == render_scene.rayBounceLeft then
+        rayFirstHit = true
+    end
+        
     random.seed(rd[1] + math.random(-999, 999), rd[2] + math.random(-999, 999), rd[1] + math.random(-999, 999), rd[2] + math.random(-999, 999))
     
     if bounceLimit <= 0 then
@@ -300,15 +302,29 @@ function render_calcPixelRTX(ro, rd, bounceLimit, rayColor, ...)
         
         local p = ro + rd * dist
         
+        if rayFirstHit then
+            rayFirstHit = false
+            oldDist = dist 
+        end
+        
         data = render_getMaterialColorRTX(ro, rd, dist, mat, normal, cl, objData.id, roughnes, lightConsum)
         
         local color = data[1]
         local nextRD = data[2]
         
+        
+        if mat == "glass" then
+            if data[3] then
+                p = ro + rd * obj[2]
+            end
+        end
+        
+        
         if nextRD == Vector() then
             if rayFirstHit then return {cl, true} end
             local color = rayColor + cl * objData.lightPower
-            return {mixC(color, render_scene.bgColor, math_exp(render_scene.bgExp * (oldDist * oldDist) * 0.02)) * render_scene.skyMul, false}
+            --return {mixC(color, render_scene.bgColor, math_exp(render_scene.bgExp * (oldDist * oldDist) * 0.02)) * render_scene.skyMul, false}
+            return {color, false}
         end
         
         color = color-- * math_clamp(ld:dot(normal), 0.01, 1)
@@ -317,11 +333,6 @@ function render_calcPixelRTX(ro, rd, bounceLimit, rayColor, ...)
         color = rayColor + sunColor + color
         
         oldLightConsum = lightConsum
-        
-        if rayFirstHit then
-            rayFirstHit = false
-            oldDist = dist 
-        end
         
         local out = render_calcPixelRTX(p, nextRD, bounceLimit - 1, color, objData.id)
         return {out[1] * lightConsum, out[2]}
@@ -334,7 +345,8 @@ function render_calcPixelRTX(ro, rd, bounceLimit, rayColor, ...)
         --local color = (rayColor + skyColor + sunColor) / 3
         local color = rayColor
         
-        return {mixC(color, render_scene.bgColor, math_exp(render_scene.bgExp * (oldDist * oldDist) * 0.02)) * render_scene.skyMul, false}
+        --return {mixC(color, Color(255, 255, 255), math_exp(render_scene.bgExp * (oldDist * oldDist) * 0.02)), false}
+        return {color, false}
     end
 end
 
@@ -349,7 +361,11 @@ function render_pixel(x, y, realX, realY)
     if not render_scene.fxAA then
         
         local ro = render_scene.camPos
-        local rd = Vector(x, y, render_scene.fov):getNormalized()
+        
+        local uvX = realX - render_scene.HALF_RES
+        local uvY = realY - render_scene.HALF_RES
+        
+        local rd = Vector(x + 0.0001, y + 0.0001, render_scene.fov):getNormalized()
         rd:rotate(render_scene.camAng)
         
         local counter = 0
@@ -405,7 +421,7 @@ function render_pixel(x, y, realX, realY)
                 local out = render_calcPixelRTX(ro, rd1 * Vector(1, -1, 1), bdoing, bgColor)
                 local colAA = out[1] + render_calcPixelRTX(ro, rd2 * Vector(1, -1, 1), bdoing, bgColor)[1] + render_calcPixelRTX(ro, rd3 * Vector(1, -1, 1), bdoing, bgColor)[1] + render_calcPixelRTX(ro, rd4 * Vector(1, -1, 1), bdoing, bgColor)[1]
                 tempColor = tempColor + colAA * 0.25
-                if counter % 4 then coroutine.yield() end
+                coroutine.yield()
                 if out[2] then break end
             end
             outColor = tempColor / counter

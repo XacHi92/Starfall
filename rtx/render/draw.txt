@@ -75,21 +75,35 @@ function drawScreen(res, tbl, cb)
 end
 
 
-local pattern = {{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {0, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
+local pattern = {{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
 local RES = 64
+
+local function colorDiff(V1,V2)
+    return abs(V1-V2):getLength() / 441.67295593006
+end
 
 local function smooth(x, y)
 
     render_scene.pixels = render_scene.pixels + 1
     local pixel = screen_data[y][x]
     local color = Color()
+    
+    local totalDiff = 0
+    local smooth = pixel
+    
     for i=1, 8 do
         local xp = pattern[i][1]
         local yp = pattern[i][2]
         local cl = screen_data[math.clamp(y + yp, 0, RES - 1)][math.clamp(x + xp, 0, RES - 1)]
-        color = color + Color(cl[1] or 0, cl[2] or 0, cl[3] or 0)
+        
+        totalDiff = totalDiff + colorDiff(pixel, cl)
+        smooth = smooth + cl
     end
-    return (pixel + color / 9) * 0.5
+    
+    totalDiff = totalDiff / 8
+    smooth = smooth / 9
+    local cl = mixC( smooth, pixel, totalDiff * smoothMult)
+    return Color(math.clamp(cl[1], 0, 255), math.clamp(cl[2], 0, 255), math.clamp(cl[3], 0, 255))
 end
 
 function startRender(res, perf, renderFunc, callBack, startX, endX, startY, endY)
